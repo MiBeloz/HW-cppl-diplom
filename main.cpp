@@ -24,7 +24,7 @@ int main() {
 
 	std::cout << "[Section1]" << std::endl;
 	print_result(parser, double(), "Section1", "var1");
-	print_result(parser, std::string(), "Section1", "var2");
+	print_result(parser, double(), "Section1", "var2");
 	print_result(parser, std::string(), "Section1", "var3");
 	print_result(parser, std::string(), "Section1", "var4");
 	std::cout << std::endl;
