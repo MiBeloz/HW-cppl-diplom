@@ -20,7 +20,7 @@ int main() {
 	std::cout << "\tПарсер INI файлов.\n" << std::endl;
 #endif // WIN32
 
-	ini_parser parser("ini_file.txt");
+	ini_parser parser("ini_file.ini");
 
 	std::cout << "[Section1]" << std::endl;
 	print_result(parser, double(), "Section1", "var1");
