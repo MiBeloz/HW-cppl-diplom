@@ -3,4 +3,5 @@
 !*.h
 !*.cpp
 !*.txt
+!*.ini
 CMakeCache.txt
