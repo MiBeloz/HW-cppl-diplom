@@ -64,14 +64,14 @@ void print_result(ini_parser& parser, T, std::string section, std::string name) 
 	catch (ParserThrows parser_throws) {
 		switch (parser_throws) {
 		case ParserThrows::file_read_error:
-			std::cerr << "FILE READ ERROR" << std::endl;
+			std::cerr << "FILE READ ERROR. Application will be closed" << std::endl;
 			std::cin.get();
 			exit(0);
 		case ParserThrows::section_not_found:
 			std::cerr << "Incorrect section. Section not found" << std::endl;
 			break;
 		case ParserThrows::value_error:
-			std::cerr << "Incorrect value on line " << parser.get_line() << ". ERROR FILE" << std::endl;
+			std::cerr << "Incorrect value on line " << parser.get_line() << ". ERROR FILE. Application will be closed" << std::endl;
 			std::cin.get();
 			exit(0);
 		case ParserThrows::no_value:
@@ -87,6 +87,18 @@ void print_result(ini_parser& parser, T, std::string section, std::string name) 
 		case ParserThrows::invalid_type:
 			std::cout << "Invalid type '" << name << "' on line " << parser.get_line() << std::endl;
 			break;
+		default:
+			std::cout << "Unknown error. Application will be closed" << std::endl;
+			std::cin.get();
+			exit(0);
 		}
+	}
+	catch (std::bad_any_cast& ex) {
+		std::cout << "Invalid type '" << name << "' on line " << parser.get_line() << "(" << ex.what() << ")" << std::endl;
+	}
+	catch (...) {
+		std::cout << "Unknown error. Application will be closed" << std::endl;
+		std::cin.get();
+		exit(0);
 	}
 }

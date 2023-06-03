@@ -5,6 +5,7 @@
 #include <algorithm>
 #include <set>
 #include <regex>
+#include <any>
 
 enum class ParserThrows {
 	file_read_error,
@@ -18,10 +19,15 @@ enum class ParserThrows {
 
 class ini_parser final {
 public:
-	explicit ini_parser(const std::string& filename) : m_filename(filename) {}
+	explicit ini_parser(const std::string& filename = "ini_file.ini") : m_filename(filename) {}
+	ini_parser(const ini_parser&) = delete;
+	ini_parser(ini_parser&& other) = delete;
+	ini_parser& operator=(const ini_parser& other) = delete;
+	ini_parser& operator=(ini_parser&& other) = delete;
+	~ini_parser() {};
 
 	template<typename T>
-	T get_value(const std::string& section_value) = delete;
+	T get_value(const std::string& section_value);
 
 	std::set<std::string>& get_possible_variables() noexcept;
 	size_t get_line() const noexcept;
@@ -31,10 +37,10 @@ private:
 	std::set<std::string> m_possible_variables;
 	size_t m_number_of_line = 0;
 
+	std::any return_value(const std::string& result_value);
+
 	std::string get_str_section(const std::string& section_value) const noexcept;
 	std::string get_str_value(const std::string& section_value) const noexcept;
-
-	void get(const std::string& section, const std::string& value, std::string& result_value);
 
 	bool file_section_check(std::string& file_section) noexcept;
 	bool file_value_check(std::string& file_value);
@@ -45,71 +51,10 @@ private:
 };
 
 
-inline std::set<std::string>& ini_parser::get_possible_variables() noexcept {
-	return m_possible_variables;
-}
-
-inline size_t ini_parser::get_line() const noexcept {
-	return m_number_of_line;
-}
-
-template<>
-inline int ini_parser::get_value<int>(const std::string& section_value) {
-	std::string result_value;
-	const std::regex rgx{ "^[0-9]*$" };
-
-	get(get_str_section(section_value), get_str_value(section_value), result_value);
-
-	if (!std::regex_match(result_value, rgx)) {
-		throw ParserThrows::invalid_type;
-	}
-
-	return std::stoi(result_value);
-}
-
-template<>
-inline double ini_parser::get_value<double>(const std::string& section_value) {
-	std::string result_value;
-	const std::regex rgx{ "^(0\\.[0-9]{1,9})||([1-9]{1,}[0-9]*\\.[0-9]{1,9})$" };
-
-	get(get_str_section(section_value), get_str_value(section_value), result_value);
-	
-	if (!std::regex_match(result_value, rgx)) {
-		throw ParserThrows::invalid_type;
-	}
-
-	return std::stod(result_value);
-}
-
-template<>
-inline std::string ini_parser::get_value<std::string>(const std::string& section_value) {
-	std::string result_value;
-	get(get_str_section(section_value), get_str_value(section_value), result_value);
-
-	return result_value;
-}
-
-inline std::string ini_parser::get_str_section(const std::string& section_value) const noexcept {
-	std::string section = section_value;
-	auto it = find(section.begin(), section.end(), '.');
-	if (it != section.end()) {
-		section.erase(it, section.end());
-	}
-
-	return section;
-}
-
-inline std::string ini_parser::get_str_value(const std::string& section_value) const noexcept {
-	std::string value = section_value;
-	auto it = find(value.begin(), value.end(), '.');
-	if (it != value.end()) {
-		value.erase(value.begin(), ++it);
-	}
-	return value;
-}
-
-inline void ini_parser::get(const std::string& section, const std::string& value, std::string& result_value) {
+template<typename T>
+T ini_parser::get_value(const std::string& section_value) {
 	m_possible_variables.clear();
+	std::string result_value;
 	m_number_of_line = 0;
 	size_t temp_number_of_line = 0;
 
@@ -126,7 +71,7 @@ inline void ini_parser::get(const std::string& section, const std::string& value
 			m_number_of_line++;
 
 			if (file_section_check(file_section)) {
-				if (file_section == '[' + section + ']') {
+				if (file_section == '[' + get_str_section(section_value) + ']') {
 					while (!file.eof()) {
 						std::getline(file, file_value);
 						m_number_of_line++;
@@ -140,7 +85,7 @@ inline void ini_parser::get(const std::string& section, const std::string& value
 									temp_file_value.erase(it, temp_file_value.end());
 								}
 
-								if (value == temp_file_value) {
+								if (temp_file_value == get_str_value(section_value)) {
 									result_value = file_value;
 
 									auto it_result_value = std::find(result_value.begin(), result_value.end(), '=');
@@ -185,9 +130,56 @@ inline void ini_parser::get(const std::string& section, const std::string& value
 	if (result_value.empty()) {
 		throw ParserThrows::no_value;
 	}
+
+	return std::any_cast<T>(return_value(result_value));
 }
 
-inline bool ini_parser::file_section_check(std::string& file_section) noexcept {
+inline std::any ini_parser::return_value(const std::string& result_value) {
+	const std::regex rgx_int{ "^[0-9]*$" };
+	const std::regex rgx_double{ "^(0\\.[0-9]{1,9})||([1-9]{1,}[0-9]*\\.[0-9]{1,9})$" };
+	std::any result_any;
+
+	if (std::regex_match(result_value, rgx_int)) {
+		result_any = std::stoi(result_value);
+	}
+	else if (std::regex_match(result_value, rgx_double)) {
+		result_any = stod(result_value);
+	}
+	else {
+		result_any = result_value;
+	}
+
+	return result_any;
+}
+
+inline std::set<std::string>& ini_parser::get_possible_variables() noexcept {
+	return m_possible_variables;
+}
+
+inline size_t ini_parser::get_line() const noexcept {
+	return m_number_of_line;
+}
+
+inline std::string ini_parser::get_str_section(const std::string& section_value) const noexcept {
+	std::string section = section_value;
+	auto it = find(section.begin(), section.end(), '.');
+	if (it != section.end()) {
+		section.erase(it, section.end());
+	}
+
+	return section;
+}
+
+inline std::string ini_parser::get_str_value(const std::string& section_value) const noexcept {
+	std::string value = section_value;
+	auto it = find(value.begin(), value.end(), '.');
+	if (it != value.end()) {
+		value.erase(value.begin(), ++it);
+	}
+	return value;
+}
+
+bool ini_parser::file_section_check(std::string& file_section) noexcept {
 	if (file_section.size() > 0  && file_section[0] != ';') {
 		delete_spaces(file_section);
 		delete_comment(file_section);
@@ -204,7 +196,7 @@ inline bool ini_parser::file_section_check(std::string& file_section) noexcept {
 	return false;
 }
 
-inline bool ini_parser::file_value_check(std::string& file_value) {
+bool ini_parser::file_value_check(std::string& file_value) {
 	if (file_value.size() > 0 && file_value[0] != ';') {
 		delete_spaces(file_value);
 		delete_comment(file_value);
